@@ -10,6 +10,7 @@ Plugins can be placed in any of the following locations (searched in order):
 
 1. ``~/.config/plottter/plugins/`` (user-level plugins)
 2. ``<current_working_directory>/plugins/`` (project-level plugins)
+3. ``<sys._MEIPASS>/plugins/`` (plugins shipped inside a PyInstaller bundle)
 
 Each plugin file must be a valid Python module (``*.py``) at the top level of
 the plugins directory.  Sub-packages are not scanned.
@@ -61,6 +62,20 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def _bundled_plugin_dir() -> Path | None:
+    """Return the plugins directory inside a PyInstaller bundle, if frozen.
+
+    A normal interpreter (development, tests, ``python -m plottter``) is not
+    frozen, so this returns ``None`` and the search path stays unchanged.
+    """
+    if not getattr(sys, "frozen", False):
+        return None
+    base = getattr(sys, "_MEIPASS", None)
+    if not base:
+        return None
+    return Path(base) / "plugins"
+
+
 def _get_plugin_dirs() -> list[Path]:
     """Return the list of directories to search for plugins, in priority order."""
     dirs: list[Path] = []
@@ -72,6 +87,11 @@ def _get_plugin_dirs() -> list[Path]:
     # 2. Current working directory / plugins
     cwd_plugins = Path.cwd() / "plugins"
     dirs.append(cwd_plugins)
+
+    # 3. Plugins shipped inside the frozen application.
+    bundled = _bundled_plugin_dir()
+    if bundled is not None:
+        dirs.append(bundled)
 
     return dirs
 
